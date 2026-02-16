@@ -14,17 +14,18 @@ const SidebarContainer = styled(motion.div)`
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   z-index: 10;
+  max-height: 70vh;
 `;
 
 const Indicator = styled.div<{ $active: boolean }>`
   width: 3px;
-  height: ${(props) => (props.$active ? '24px' : '12px')};
+  height: ${(props) => (props.$active ? '20px' : '10px')};
   background: ${(props) =>
     props.$active ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.3)'};
   border-radius: 2px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 `;
 
 const Logo = styled.div`
@@ -40,19 +41,8 @@ const Logo = styled.div`
 export function Sidebar({ totalItems, currentIndex, isVisible }: SidebarProps) {
   if (!isVisible) return null;
 
-  // Show max 15 indicators, centered around current
-  const maxIndicators = Math.min(totalItems, 15);
-  const halfMax = Math.floor(maxIndicators / 2);
-
-  let start = Math.max(0, currentIndex - halfMax);
-  const end = Math.min(totalItems, start + maxIndicators);
-
-  if (end - start < maxIndicators) {
-    start = Math.max(0, end - maxIndicators);
-  }
-
   const indicators = [];
-  for (let i = start; i < end; i++) {
+  for (let i = 0; i < totalItems; i++) {
     indicators.push(
       <Indicator key={i} $active={i === currentIndex} />
     );

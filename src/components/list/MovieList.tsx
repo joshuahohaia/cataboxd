@@ -14,10 +14,9 @@ const ListContainer = styled(motion.div)`
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 40px;
+  padding: 80px 40px 80px 60px;
   align-items: center;
   min-height: 100%;
-  justify-content: center;
 `;
 
 export function MovieList({ movies, onSelect, selectedId }: MovieListProps) {

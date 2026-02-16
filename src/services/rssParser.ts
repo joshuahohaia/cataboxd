@@ -1,4 +1,3 @@
-import Parser from 'rss-parser';
 import type { Movie } from '../types/movie';
 import {
   extractPosterUrl,
@@ -8,44 +7,21 @@ import {
 } from './posterExtractor';
 
 const CORS_PROXIES = [
-  'https://api.allorigins.win/raw?url=',
   'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url=',
 ];
-
-const LETTERBOXD_RSS = 'https://letterboxd.com/joshaia/rss/';
-
-interface LetterboxdItem {
-  title?: string;
-  link?: string;
-  guid?: string;
-  content?: string;
-  'content:encoded'?: string;
-  filmTitle?: string;
-  filmYear?: string;
-  memberRating?: string;
-  watchedDate?: string;
-  rewatch?: string;
-  memberLike?: string;
-}
-
-// Configure parser for Letterboxd's custom fields
-const parser: Parser<unknown, LetterboxdItem> = new Parser({
-  customFields: {
-    item: [
-      ['letterboxd:filmTitle', 'filmTitle'],
-      ['letterboxd:filmYear', 'filmYear'],
-      ['letterboxd:memberRating', 'memberRating'],
-      ['letterboxd:watchedDate', 'watchedDate'],
-      ['letterboxd:rewatch', 'rewatch'],
-      ['letterboxd:memberLike', 'memberLike'],
-    ],
-  },
-});
 
 async function fetchWithFallback(url: string): Promise<string> {
   for (const proxy of CORS_PROXIES) {
     try {
-      const response = await fetch(proxy + encodeURIComponent(url));
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const response = await fetch(proxy + encodeURIComponent(url), {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         return await response.text();
       }
@@ -53,32 +29,72 @@ async function fetchWithFallback(url: string): Promise<string> {
       continue;
     }
   }
-  throw new Error('All CORS proxies failed');
+  throw new Error('Failed to fetch feed. Check the username and try again.');
 }
 
-export async function fetchLetterboxdFeed(): Promise<Movie[]> {
-  const xmlContent = await fetchWithFallback(LETTERBOXD_RSS);
-  const feed = await parser.parseString(xmlContent);
+function getTextContent(element: Element, tagName: string): string {
+  const el = element.getElementsByTagName(tagName)[0];
+  return el?.textContent?.trim() || '';
+}
 
-  return feed.items
-    .filter((item) => {
-      // Filter out list entries (they don't have filmTitle)
-      return item.filmTitle || item.title?.match(/^\w+.*,\s*\d{4}/);
-    })
-    .map((item) => {
-      const htmlContent = item.content || item['content:encoded'] || '';
+function getNamespacedContent(element: Element, namespace: string, localName: string): string {
+  let el = element.getElementsByTagName(`${namespace}:${localName}`)[0];
+  if (!el) {
+    el = element.getElementsByTagName(localName)[0];
+  }
+  return el?.textContent?.trim() || '';
+}
 
-      return {
-        id: item.guid || item.link || crypto.randomUUID(),
-        filmTitle: item.filmTitle || extractTitleFromTitle(item.title || ''),
-        filmYear: parseInt(item.filmYear || '0') || extractYearFromTitle(item.title || ''),
-        memberRating: parseFloat(item.memberRating || '0') || 0,
-        posterUrl: extractPosterUrl(htmlContent),
-        review: extractReviewText(htmlContent),
-        watchedDate: item.watchedDate || '',
-        link: item.link || '',
-        isRewatch: item.rewatch === 'Yes',
-        isLiked: item.memberLike === 'Yes',
-      };
+export async function fetchLetterboxdFeed(username: string): Promise<Movie[]> {
+  const rssUrl = `https://letterboxd.com/${username}/rss/`;
+  const xmlContent = await fetchWithFallback(rssUrl);
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlContent, 'text/xml');
+
+  // Check for parse errors
+  const parseError = doc.querySelector('parsererror');
+  if (parseError) {
+    throw new Error('Invalid RSS feed. Check the username.');
+  }
+
+  const items = doc.querySelectorAll('item');
+  const movies: Movie[] = [];
+
+  items.forEach((item) => {
+    const title = getTextContent(item, 'title');
+    const link = getTextContent(item, 'link');
+    const guid = getTextContent(item, 'guid');
+    const description = getTextContent(item, 'description');
+
+    const filmTitle = getNamespacedContent(item, 'letterboxd', 'filmTitle');
+    const filmYear = getNamespacedContent(item, 'letterboxd', 'filmYear');
+    const memberRating = getNamespacedContent(item, 'letterboxd', 'memberRating');
+    const watchedDate = getNamespacedContent(item, 'letterboxd', 'watchedDate');
+    const rewatch = getNamespacedContent(item, 'letterboxd', 'rewatch');
+    const memberLike = getNamespacedContent(item, 'letterboxd', 'memberLike');
+
+    // Skip list entries
+    if (!filmTitle && !title.match(/^.+,\s*\d{4}/)) {
+      return;
+    }
+
+    movies.push({
+      id: guid || link || crypto.randomUUID(),
+      filmTitle: filmTitle || extractTitleFromTitle(title),
+      filmYear: parseInt(filmYear) || extractYearFromTitle(title),
+      memberRating: parseFloat(memberRating) || 0,
+      posterUrl: extractPosterUrl(description),
+      review: extractReviewText(description),
+      watchedDate: watchedDate,
+      link: link,
+      isRewatch: rewatch === 'Yes',
+      isLiked: memberLike === 'Yes',
     });
+  });
+
+  if (movies.length === 0) {
+    throw new Error('No movies found. The user may not have any logged films.');
+  }
+
+  return movies;
 }

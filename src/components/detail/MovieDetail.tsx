@@ -11,14 +11,14 @@ interface MovieDetailProps {
 }
 
 const DetailContainer = styled(motion.div)`
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: #f5f5f5;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 60px;
   overflow: auto;
+  z-index: 10;
 `;
 
 const ContentWrapper = styled.div`

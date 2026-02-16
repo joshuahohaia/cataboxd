@@ -1,26 +1,50 @@
-import { AnimatePresence } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ThemeProvider } from 'styled-components';
 import { GlobalStyles } from './styles/GlobalStyles';
 import { theme } from './styles/theme';
 import { useLetterboxdFeed } from './hooks/useLetterboxdFeed';
 import { useMovieSelection } from './hooks/useMovieSelection';
-import { AppContainer } from './components/layout/AppContainer';
 import { Sidebar } from './components/layout/Sidebar';
 import { MovieList } from './components/list/MovieList';
 import { MovieDetail } from './components/detail/MovieDetail';
+import { UserInput } from './components/UserInput';
 import styled from 'styled-components';
-import { motion } from 'framer-motion';
 
-const LoadingContainer = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  color: white;
-  font-size: 18px;
+const AppWrapper = styled.div`
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
 `;
 
-const ErrorContainer = styled.div`
+const Background = styled(motion.div)`
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+`;
+
+const ScrollContainer = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+  }
+`;
+
+const LoadingContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -28,21 +52,6 @@ const ErrorContainer = styled.div`
   height: 100vh;
   color: white;
   gap: 16px;
-`;
-
-const RetryButton = styled.button`
-  padding: 12px 24px;
-  background: white;
-  color: #1a1a1a;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: transform 0.2s;
-
-  &:hover {
-    transform: scale(1.05);
-  }
 `;
 
 const LoadingSpinner = styled(motion.div)`
@@ -53,59 +62,147 @@ const LoadingSpinner = styled(motion.div)`
   border-radius: 50%;
 `;
 
+const LoadingText = styled.p`
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+`;
+
+const ChangeUserButton = styled(motion.button)`
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  z-index: 100;
+  transition: background 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+`;
+
 function App() {
-  const { movies, isLoading, error, refetch } = useLetterboxdFeed();
-  const { selectedMovie, selectedId, select, deselect, selectedIndex } =
-    useMovieSelection(movies);
+  const { movies, isLoading, error, username, loadUser, clearUser } = useLetterboxdFeed();
+  const { selectedMovie, selectedId, select, deselect } = useMovieSelection(movies);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollIndex, setScrollIndex] = useState(0);
+
+  // Auto-load saved username on mount
+  useEffect(() => {
+    if (username && movies.length === 0 && !isLoading && !error) {
+      loadUser(username);
+    }
+  }, []);
+
+  // Track scroll position to update sidebar
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container || movies.length === 0) return;
+
+    const handleScroll = () => {
+      const scrollTop = container.scrollTop;
+      const scrollHeight = container.scrollHeight - container.clientHeight;
+      if (scrollHeight <= 0) return;
+
+      const scrollPercent = scrollTop / scrollHeight;
+      const index = Math.round(scrollPercent * (movies.length - 1));
+      setScrollIndex(index);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [movies.length]);
 
   const isDarkMode = !selectedMovie;
+  const showUserInput = !username || (error && movies.length === 0);
 
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyles />
-      <AppContainer isDarkMode={isDarkMode}>
-        <Sidebar
-          totalItems={movies.length}
-          currentIndex={selectedIndex >= 0 ? selectedIndex : 0}
-          isVisible={isDarkMode && !isLoading && !error}
+      <AppWrapper>
+        <Background
+          animate={{
+            backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f5f5'
+          }}
+          transition={{ duration: 0.5, ease: 'easeInOut' }}
         />
 
-        {isLoading && (
-          <LoadingContainer>
-            <LoadingSpinner
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        <Sidebar
+          totalItems={movies.length}
+          currentIndex={scrollIndex}
+          isVisible={isDarkMode && !isLoading && !showUserInput && movies.length > 0}
+        />
+
+        <ScrollContainer ref={scrollRef}>
+          {showUserInput && !isLoading ? (
+            <UserInput
+              onSubmit={loadUser}
+              isLoading={isLoading}
+              error={error}
             />
-          </LoadingContainer>
-        )}
+          ) : (
+            <>
+              {isLoading && (
+                <LoadingContainer>
+                  <LoadingSpinner
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  />
+                  <LoadingText>Loading {username}'s diary...</LoadingText>
+                </LoadingContainer>
+              )}
 
-        {error && (
-          <ErrorContainer>
-            <p>Failed to load movies</p>
-            <p style={{ fontSize: '14px', opacity: 0.7 }}>{error}</p>
-            <RetryButton onClick={refetch}>Try Again</RetryButton>
-          </ErrorContainer>
-        )}
+              {!isLoading && movies.length > 0 && (
+                <>
+                  <AnimatePresence>
+                    {!selectedMovie && (
+                      <motion.div
+                        key="list"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.4 }}
+                      >
+                        <MovieList
+                          movies={movies}
+                          onSelect={select}
+                          selectedId={selectedId}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-        {!isLoading && !error && (
-          <AnimatePresence mode="wait">
-            {selectedMovie ? (
-              <MovieDetail
-                key="detail"
-                movie={selectedMovie}
-                onBack={deselect}
-              />
-            ) : (
-              <MovieList
-                key="list"
-                movies={movies}
-                onSelect={select}
-                selectedId={selectedId}
-              />
-            )}
-          </AnimatePresence>
+                  <AnimatePresence>
+                    {selectedMovie && (
+                      <MovieDetail
+                        key="detail"
+                        movie={selectedMovie}
+                        onBack={deselect}
+                      />
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+            </>
+          )}
+        </ScrollContainer>
+
+        {isDarkMode && username && movies.length > 0 && !isLoading && (
+          <ChangeUserButton
+            onClick={clearUser}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            @{username}
+          </ChangeUserButton>
         )}
-      </AppContainer>
+      </AppWrapper>
     </ThemeProvider>
   );
 }

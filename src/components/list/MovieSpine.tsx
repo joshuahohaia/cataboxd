@@ -84,12 +84,13 @@ const SpineRight = styled.div<{ $color: string }>`
   transform-origin: right;
 `;
 
-const Director = styled.span`
-  font-size: 14px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.8);
-  font-style: italic;
-  text-transform: capitalize;
+const WatchedDate = styled.span`
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 80px;
 `;
 
 const Title = styled.span`
@@ -122,8 +123,23 @@ function getSpineColor(index: number): string {
   return theme.spineColors[index % theme.spineColors.length];
 }
 
+function formatWatchedDate(dateStr: string): string {
+  if (!dateStr) return '';
+
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
 export function MovieSpine({ movie, index, onClick, isSelected }: MovieSpineProps) {
   const color = getSpineColor(index);
+  const watchedDate = formatWatchedDate(movie.watchedDate);
 
   return (
     <SpineWrapper
@@ -136,7 +152,7 @@ export function MovieSpine({ movie, index, onClick, isSelected }: MovieSpineProp
       <SpineContainer $color={color}>
         <SpineTop $color={color} />
         <SpineFace $color={color}>
-          <Director>{movie.filmYear}</Director>
+          <WatchedDate>{watchedDate}</WatchedDate>
           <Title>{movie.filmTitle}</Title>
           <Logo>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
