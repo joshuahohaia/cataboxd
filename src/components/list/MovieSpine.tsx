@@ -1,169 +1,237 @@
+import { useRef } from 'react';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
-import { darken, lighten } from 'polished';
 import type { Movie } from '../../types/movie';
-import { theme } from '../../styles/theme';
-import { spineVariants } from '../../styles/animations';
+import { useImageColor } from '../../hooks/useImageColor';
 
 interface MovieSpineProps {
   movie: Movie;
   index: number;
-  onClick: () => void;
+  onSelect: (id: string, element: HTMLElement, colors: { bg: string; accent: string }, rotation: number) => void;
   isSelected: boolean;
+  scrollProgress?: number;
+  totalItems: number;
+  layoutId: string;
 }
 
-const SpineWrapper = styled(motion.div)`
+// DVD case proportions - more square/wide
+const SPINE_LENGTH = 380;    // Width when lying flat
+const BOOK_THICKNESS = 14;   // Height when lying flat
+const COVER_WIDTH = 280;     // Depth - the cover art dimension
+
+const BookWrapper = styled(motion.div)`
   perspective: 1000px;
   cursor: pointer;
-  width: 100%;
-  max-width: 700px;
-`;
-
-const SpineContainer = styled.div<{ $color: string }>`
-  position: relative;
-  height: 70px;
-  transform-style: preserve-3d;
-  transform: rotateX(-8deg) rotateY(-3deg);
-  transition: transform 0.3s ease;
-
-  &:hover {
-    transform: rotateX(-5deg) rotateY(-1deg) scale(1.02);
-  }
-`;
-
-const SpineFace = styled.div<{ $color: string }>`
-  position: absolute;
-  inset: 0;
-  background: ${(props) => props.$color};
-  transform: translateZ(10px);
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 30px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-`;
-
-const SpineTop = styled.div<{ $color: string }>`
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 10px;
-  background: linear-gradient(
-    to bottom,
-    ${(props) => lighten(0.08, props.$color)},
-    ${(props) => props.$color}
-  );
-  transform: rotateX(90deg) translateZ(0);
-  transform-origin: top;
-  border-radius: 3px 3px 0 0;
-`;
-
-const SpineBottom = styled.div<{ $color: string }>`
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 10px;
-  background: ${(props) => darken(0.1, props.$color)};
-  transform: rotateX(-90deg) translateZ(0);
-  transform-origin: bottom;
-  border-radius: 0 0 3px 3px;
-`;
-
-const SpineRight = styled.div<{ $color: string }>`
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 10px;
-  background: ${(props) => darken(0.05, props.$color)};
-  transform: rotateY(90deg) translateZ(0);
-  transform-origin: right;
-`;
-
-const WatchedDate = styled.span`
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  min-width: 80px;
-`;
-
-const Title = styled.span`
-  font-size: 16px;
-  font-weight: 500;
-  color: white;
-  text-align: right;
-  flex: 1;
-  margin-left: 20px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const Logo = styled.div`
-  width: 30px;
-  height: 30px;
-  margin-left: 20px;
-  opacity: 0.6;
+  height: 100px;
+  margin-bottom: -70px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
+  position: relative;
 `;
 
-function getSpineColor(index: number): string {
-  return theme.spineColors[index % theme.spineColors.length];
-}
+const Book3D = styled(motion.div)`
+  position: relative;
+  width: ${SPINE_LENGTH}px;
+  height: ${BOOK_THICKNESS}px;
+  transform-style: preserve-3d;
+`;
+
+const Face = styled.div`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+`;
+
+// Front face - spine with title
+const FaceFront = styled(Face) <{ $bgColor: string }>`
+  width: ${SPINE_LENGTH}px;
+  height: ${BOOK_THICKNESS}px;
+  margin-left: -${SPINE_LENGTH / 2}px;
+  margin-top: -${BOOK_THICKNESS / 2}px;
+  background: ${(props) => props.$bgColor};
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  transform: translateZ(${COVER_WIDTH / 2}px);
+`;
+
+// Back face
+const FaceBack = styled(Face) <{ $bgColor: string }>`
+  width: ${SPINE_LENGTH}px;
+  height: ${BOOK_THICKNESS}px;
+  margin-left: -${SPINE_LENGTH / 2}px;
+  margin-top: -${BOOK_THICKNESS / 2}px;
+  background: ${(props) => props.$bgColor};
+  filter: brightness(0.5);
+  transform: rotateY(180deg) translateZ(${COVER_WIDTH / 2}px);
+`;
+
+// Top face - the cover with poster (THIS IS WHAT YOU SEE)
+const FaceTop = styled(Face) <{ $bgColor: string }>`
+  width: ${SPINE_LENGTH}px;
+  height: ${COVER_WIDTH}px;
+  margin-left: -${SPINE_LENGTH / 2}px;
+  margin-top: -${COVER_WIDTH / 2}px;
+  background-color: ${(props) => props.$bgColor};
+  transform: rotateX(90deg) translateZ(${BOOK_THICKNESS / 2}px);
+  overflow: hidden;
+`;
+
+// Bottom face
+const FaceBottom = styled(Face) <{ $bgColor: string }>`
+  width: ${SPINE_LENGTH}px;
+  height: ${COVER_WIDTH}px;
+  margin-left: -${SPINE_LENGTH / 2}px;
+  margin-top: -${COVER_WIDTH / 2}px;
+  background: ${(props) => props.$bgColor};
+  filter: brightness(0.3);
+  transform: rotateX(-90deg) translateZ(${BOOK_THICKNESS / 2}px);
+`;
+
+// Left face
+const FaceLeft = styled(Face) <{ $bgColor: string }>`
+  width: ${COVER_WIDTH}px;
+  height: ${BOOK_THICKNESS}px;
+  margin-left: -${COVER_WIDTH / 2}px;
+  margin-top: -${BOOK_THICKNESS / 2}px;
+  background: ${(props) => props.$bgColor};
+  filter: brightness(0.85);
+  transform: rotateY(-90deg) translateZ(${SPINE_LENGTH / 2}px);
+`;
+
+// Right face
+const FaceRight = styled(Face) <{ $bgColor: string }>`
+  width: ${COVER_WIDTH}px;
+  height: ${BOOK_THICKNESS}px;
+  margin-left: -${COVER_WIDTH / 2}px;
+  margin-top: -${BOOK_THICKNESS / 2}px;
+  background: ${(props) => props.$bgColor};
+  filter: brightness(0.7);
+  transform: rotateY(90deg) translateZ(${SPINE_LENGTH / 2}px);
+`;
+
+const PosterImage = styled.img`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: rotate(-90deg) scale(1.357);
+  transform-origin: center center;
+`;
+
+const SpineContent = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+`;
+
+const WatchedDate = styled.span`
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+`;
+
+const Title = styled.span`
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  text-align: right;
+  margin: 0 12px;
+`;
+
+const Logo = styled.div`
+  opacity: 0.4;
+  color: white;
+  display: flex;
+  align-items: center;
+`;
 
 function formatWatchedDate(dateStr: string): string {
   if (!dateStr) return '';
-
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
   } catch {
     return dateStr;
   }
 }
 
-export function MovieSpine({ movie, index, onClick, isSelected }: MovieSpineProps) {
-  const color = getSpineColor(index);
+export function MovieSpine({ movie, index, onSelect, isSelected, scrollProgress = 0.5, totalItems, layoutId }: MovieSpineProps) {
+  const colors = useImageColor(movie.posterUrl, index, movie.filmTitle);
   const watchedDate = formatWatchedDate(movie.watchedDate);
+  const ref = useRef<HTMLDivElement>(null);
+  const bookRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic rotation based on scroll position
+  // Items at top of viewport tilt forward (show more cover)
+  // Items at bottom tilt back (show more spine)
+  const minRotation = -30; // Top of screen - tilted back, showing cover
+  const maxRotation = -5;  // Bottom of screen - more upright, showing spine
+  const rotation = minRotation + (scrollProgress * (maxRotation - minRotation));
+
+  const handleClick = () => {
+    if (bookRef.current) {
+      onSelect(movie.id, bookRef.current, colors, rotation);
+    }
+  };
 
   return (
-    <SpineWrapper
-      layoutId={`movie-${movie.id}`}
-      variants={spineVariants}
-      onClick={onClick}
-      whileHover={{ scale: 1.02 }}
-      style={{ opacity: isSelected ? 0 : 1 }}
+    <BookWrapper
+      ref={ref}
+      onClick={handleClick}
+      layoutId={layoutId}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      style={{
+        zIndex: totalItems - index,
+        pointerEvents: isSelected ? 'none' : 'auto',
+        visibility: isSelected ? 'hidden' : 'visible',
+      }}
     >
-      <SpineContainer $color={color}>
-        <SpineTop $color={color} />
-        <SpineFace $color={color}>
-          <WatchedDate>{watchedDate}</WatchedDate>
-          <Title>{movie.filmTitle}</Title>
-          <Logo>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 6v6l4 2" />
-            </svg>
-          </Logo>
-        </SpineFace>
-        <SpineBottom $color={color} />
-        <SpineRight $color={color} />
-      </SpineContainer>
-    </SpineWrapper>
+      <Book3D
+        ref={bookRef}
+        animate={{ rotateX: rotation }}
+        whileHover={{
+          translateZ: 20,
+          transition: { duration: 0.2 }
+        }}
+      >
+        <FaceFront $bgColor={colors.bg}>
+          <SpineContent>
+            <WatchedDate>{watchedDate}</WatchedDate>
+            <Title>{movie.filmTitle}</Title>
+            <Logo>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </Logo>
+          </SpineContent>
+        </FaceFront>
+        <FaceBack $bgColor={colors.bg} />
+        <FaceTop $bgColor={colors.bg}>
+          {movie.posterUrl && <PosterImage src={movie.posterUrl} alt={movie.filmTitle} />}
+        </FaceTop>
+        <FaceBottom $bgColor={colors.bg} />
+        <FaceLeft $bgColor={colors.accent} />
+        <FaceRight $bgColor={colors.accent} />
+      </Book3D>
+    </BookWrapper>
   );
 }
+
+export { useImageColor, SPINE_LENGTH, BOOK_THICKNESS, COVER_WIDTH };

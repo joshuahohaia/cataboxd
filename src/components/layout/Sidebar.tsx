@@ -10,8 +10,7 @@ interface SidebarProps {
 const SidebarContainer = styled(motion.div)`
   position: fixed;
   left: 24px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 120px;
   display: flex;
   flex-direction: column;
   gap: 4px;
