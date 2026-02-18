@@ -115,7 +115,7 @@ const FloatingBookContainer = styled(motion.div)`
   pointer-events: none;
 
   @media (max-width: 768px) {
-    padding-top: 12vh;
+    padding-top: 8vh;
     transform: scale(0.7);
     transform-origin: top left;
   }
@@ -255,8 +255,8 @@ const DetailOverlay = styled(motion.div)`
 
   @media (max-width: 768px) {
     padding: 20px;
-    align-items: flex-end;
-    padding-bottom: 40px;
+    align-items: flex-start;
+    overflow-y: auto;
   }
 `;
 
@@ -275,6 +275,7 @@ const DetailContent = styled(motion.div)`
     max-width: 100%;
     width: 100%;
     padding: 0 16px;
+    margin-top: 42vh;
   }
 `;
 
