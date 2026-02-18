@@ -115,6 +115,7 @@ const FloatingBookContainer = styled(motion.div)`
   pointer-events: none;
 
   @media (max-width: 768px) {
+    padding-top: 12vh;
     transform: scale(0.7);
     transform-origin: top left;
   }
