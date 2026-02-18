@@ -7,11 +7,20 @@ import {
 } from './posterExtractor';
 
 const CORS_PROXIES = [
-  'https://corsproxy.io/?',
   'https://api.allorigins.win/raw?url=',
+  'https://api.codetabs.com/v1/proxy?quest=',
+  'https://corsproxy.io/?',
 ];
 
-async function fetchWithFallback(url: string): Promise<string> {
+async function fetchFromApi(username: string): Promise<string> {
+  const response = await fetch(`/api/rss?username=${encodeURIComponent(username)}`);
+  if (!response.ok) {
+    throw new Error(`API returned ${response.status}`);
+  }
+  return response.text();
+}
+
+async function fetchWithCorsProxy(url: string): Promise<string> {
   for (const proxy of CORS_PROXIES) {
     try {
       const controller = new AbortController();
@@ -47,7 +56,15 @@ function getNamespacedContent(element: Element, namespace: string, localName: st
 
 export async function fetchLetterboxdFeed(username: string): Promise<Movie[]> {
   const rssUrl = `https://letterboxd.com/${username}/rss/`;
-  const xmlContent = await fetchWithFallback(rssUrl);
+
+  let xmlContent: string;
+  try {
+    // Try our own API route first (works in production)
+    xmlContent = await fetchFromApi(username);
+  } catch {
+    // Fall back to CORS proxies (useful for local dev)
+    xmlContent = await fetchWithCorsProxy(rssUrl);
+  }
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlContent, 'text/xml');
 

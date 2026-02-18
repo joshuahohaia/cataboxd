@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 
 // Generate a consistent hash from a string
 function hashString(str: string): number {
@@ -55,109 +55,13 @@ function generateColorsFromTitle(title: string): { bg: string; accent: string } 
   };
 }
 
-// Find dominant color using color quantization
-function extractDominantColor(imageData: Uint8ClampedArray): { r: number; g: number; b: number } | null {
-  const colorBuckets: Map<string, { r: number; g: number; b: number; count: number }> = new Map();
-
-  // Quantize colors into buckets (reduce to ~32 levels per channel)
-  for (let i = 0; i < imageData.length; i += 4) {
-    const r = Math.round(imageData[i] / 8) * 8;
-    const g = Math.round(imageData[i + 1] / 8) * 8;
-    const b = Math.round(imageData[i + 2] / 8) * 8;
-    const a = imageData[i + 3];
-
-    // Skip transparent or near-black/white pixels
-    if (a < 128) continue;
-    const brightness = (r + g + b) / 3;
-    if (brightness < 20 || brightness > 235) continue;
-
-    // Skip very desaturated colors
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const saturation = max === 0 ? 0 : (max - min) / max;
-    if (saturation < 0.15) continue;
-
-    const key = `${r},${g},${b}`;
-    const existing = colorBuckets.get(key);
-    if (existing) {
-      existing.count++;
-    } else {
-      colorBuckets.set(key, { r, g, b, count: 1 });
-    }
-  }
-
-  // Find the most common color
-  let dominant: { r: number; g: number; b: number; count: number } | null = null;
-  for (const color of colorBuckets.values()) {
-    if (!dominant || color.count > dominant.count) {
-      dominant = color;
-    }
-  }
-
-  return dominant ? { r: dominant.r, g: dominant.g, b: dominant.b } : null;
-}
-
-export function useImageColor(imageUrl: string, index: number, title?: string) {
-  // Generate initial colors from title if available, otherwise use index-based fallback
-  const fallbackColors = title
-    ? generateColorsFromTitle(title)
-    : generateColorsFromTitle(`movie-${index}`);
-
-  const [colors, setColors] = useState(fallbackColors);
-
-  useEffect(() => {
-    if (!imageUrl) {
-      setColors(fallbackColors);
-      return;
-    }
-
-    // Try to extract color from image
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          setColors(fallbackColors);
-          return;
-        }
-
-        // Use larger sample for better color extraction
-        canvas.width = 100;
-        canvas.height = 150;
-        ctx.drawImage(img, 0, 0, 100, 150);
-
-        const imageData = ctx.getImageData(0, 0, 100, 150).data;
-        const dominant = extractDominantColor(imageData);
-
-        if (dominant) {
-          const { r, g, b } = dominant;
-
-          // Create darker bg and slightly lighter accent
-          const darken = (c: number) => Math.max(0, Math.floor(c * 0.5));
-          const accent = (c: number) => Math.min(255, Math.floor(c * 0.8));
-
-          setColors({
-            bg: `rgb(${darken(r)}, ${darken(g)}, ${darken(b)})`,
-            accent: `rgb(${accent(r)}, ${accent(g)}, ${accent(b)})`,
-          });
-        } else {
-          setColors(fallbackColors);
-        }
-      } catch {
-        // CORS error, use fallback
-        setColors(fallbackColors);
-      }
-    };
-
-    img.onerror = () => {
-      setColors(fallbackColors);
-    };
-
-    img.src = imageUrl;
-  }, [imageUrl, index, fallbackColors]);
+export function useImageColor(_imageUrl: string, index: number, title?: string) {
+  // Generate colors from title - Letterboxd CDN doesn't support CORS so we can't extract from images
+  const colors = useMemo(() => {
+    return title
+      ? generateColorsFromTitle(title)
+      : generateColorsFromTitle(`movie-${index}`);
+  }, [title, index]);
 
   return colors;
 }

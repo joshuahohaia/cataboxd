@@ -364,11 +364,6 @@ function App() {
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const lastPositionRef = useRef({ startX: 0, startY: 0, startRotation: -15 });
 
-  useEffect(() => {
-    if (username && movies.length === 0 && !isLoading && !error) {
-      loadUser(username);
-    }
-  }, []);
 
   useEffect(() => {
     const container = scrollRef.current;
