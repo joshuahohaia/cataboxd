@@ -1,9 +1,9 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useCallback } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
 import type { Movie } from '../../types/movie';
 import { MovieSpine } from './MovieSpine';
-import { listVariants } from '../../styles/animations';
 
 interface MovieListProps {
   movies: Movie[];
@@ -12,83 +12,99 @@ interface MovieListProps {
 }
 
 const ListContainer = styled(motion.div)`
+  padding: var(--list-padding) 40px var(--list-padding) var(--list-padding-left);
   display: flex;
   flex-direction: column;
-  padding: 80px 40px 80px 80px;
   align-items: center;
-  min-height: 100%;
+
+  @media (max-width: 768px) {
+    padding: var(--list-padding) 16px;
+  }
 `;
 
+const VirtualContainer = styled.div`
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+`;
+
+const VirtualItem = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+`;
+
+// Effective item height: wrapper height + margin
+const ITEM_HEIGHT = 30; // 100px - 70px overlap
+
 export function MovieList({ movies, onSelect, selectedId }: MovieListProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [itemPositions, setItemPositions] = useState<number[]>([]);
+  const parentRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let rafId: number;
+  const virtualizer = useVirtualizer({
+    count: movies.length,
+    getScrollElement: () => parentRef.current?.parentElement ?? null,
+    estimateSize: () => ITEM_HEIGHT,
+    overscan: 10,
+  });
 
-    const updatePositions = () => {
-      if (!containerRef.current) return;
+  const virtualItems = virtualizer.getVirtualItems();
 
-      const container = containerRef.current;
-      const viewportHeight = window.innerHeight;
+  // Calculate scroll progress for an item based on its position in viewport
+  const getScrollProgress = useCallback((index: number) => {
+    if (!parentRef.current?.parentElement) return 0.5;
 
-      const positions = movies.map((_, index) => {
-        const item = container.children[index] as HTMLElement;
-        if (!item) return 0.5;
+    const scrollElement = parentRef.current.parentElement;
+    const scrollTop = scrollElement.scrollTop;
+    const viewportHeight = scrollElement.clientHeight;
+    const listPadding = 80; // top padding
 
-        const itemRect = item.getBoundingClientRect();
-        const itemCenter = itemRect.top + itemRect.height / 2;
+    // Calculate item's position relative to viewport
+    const itemTop = listPadding + (index * ITEM_HEIGHT) - scrollTop;
+    const itemCenter = itemTop + (ITEM_HEIGHT / 2);
 
-        // Calculate progress: 0 = top of viewport, 1 = bottom of viewport
-        // Use easing for smoother visual effect
-        const rawProgress = itemCenter / viewportHeight;
-        const progress = Math.max(0, Math.min(1, rawProgress));
-        return progress;
-      });
-
-      setItemPositions(positions);
-    };
-
-    const handleScroll = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(updatePositions);
-    };
-
-    updatePositions();
-
-    const parent = containerRef.current?.parentElement;
-    if (parent) {
-      parent.addEventListener('scroll', handleScroll, { passive: true });
-      window.addEventListener('resize', handleScroll, { passive: true });
-
-      return () => {
-        cancelAnimationFrame(rafId);
-        parent.removeEventListener('scroll', handleScroll);
-        window.removeEventListener('resize', handleScroll);
-      };
-    }
-  }, [movies.length]);
+    // Progress: 0 = top, 1 = bottom
+    const progress = itemCenter / viewportHeight;
+    return Math.max(0, Math.min(1, progress));
+  }, []);
 
   return (
     <ListContainer
-      ref={containerRef}
-      variants={listVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
+      ref={parentRef}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
     >
-      {movies.map((movie, index) => (
-        <MovieSpine
-          key={movie.id}
-          movie={movie}
-          index={index}
-          onSelect={onSelect}
-          isSelected={selectedId === movie.id}
-          scrollProgress={itemPositions[index] ?? 0.5}
-          totalItems={movies.length}
-          layoutId={`book-wrapper-${movie.id}`}
-        />
-      ))}
+      <VirtualContainer
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
+        {virtualItems.map((virtualItem) => {
+          const movie = movies[virtualItem.index];
+          return (
+            <VirtualItem
+              key={movie.id}
+              style={{
+                transform: `translateY(${virtualItem.start}px)`,
+                zIndex: movies.length - virtualItem.index,
+              }}
+            >
+              <MovieSpine
+                movie={movie}
+                index={virtualItem.index}
+                onSelect={onSelect}
+                isSelected={selectedId === movie.id}
+                scrollProgress={getScrollProgress(virtualItem.index)}
+                totalItems={movies.length}
+                layoutId={`book-wrapper-${movie.id}`}
+              />
+            </VirtualItem>
+          );
+        })}
+      </VirtualContainer>
     </ListContainer>
   );
 }

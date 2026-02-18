@@ -16,6 +16,10 @@ const SidebarContainer = styled(motion.div)`
   gap: 4px;
   z-index: 10;
   max-height: 70vh;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
 `;
 
 const Indicator = styled.div<{ $active: boolean }>`
@@ -35,6 +39,12 @@ const Logo = styled.div`
   font-weight: 700;
   color: white;
   letter-spacing: -1px;
+
+  @media (max-width: 768px) {
+    top: 16px;
+    left: 16px;
+    font-size: 20px;
+  }
 `;
 
 export function Sidebar({ totalItems, currentIndex, isVisible }: SidebarProps) {

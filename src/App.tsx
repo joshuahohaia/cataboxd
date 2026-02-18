@@ -89,6 +89,13 @@ const ChangeUserButton = styled(motion.button)`
   &:hover {
     background: rgba(255, 255, 255, 0.2);
   }
+
+  @media (max-width: 768px) {
+    bottom: 16px;
+    right: 16px;
+    padding: 8px 12px;
+    font-size: 11px;
+  }
 `;
 
 // Full screen overlay for detail view - slightly washed out for contrast
@@ -106,6 +113,11 @@ const FloatingBookContainer = styled(motion.div)`
   z-index: 200;
   perspective: 1000px;
   pointer-events: none;
+
+  @media (max-width: 768px) {
+    transform: scale(0.7);
+    transform-origin: top left;
+  }
 `;
 
 // The floating book - matches list spine dimensions exactly
@@ -166,9 +178,9 @@ const PosterImage = styled.img`
   left: 50%;
   height: ${LIST_SPINE_LENGTH}px;
   width: ${LIST_COVER_WIDTH}px;
-  object-fit: cover;
   object-position: center;
   transform: translate(-50%, -50%) rotate(-90deg);
+  background: inherit;
 `;
 
 // Bottom face
@@ -239,6 +251,12 @@ const DetailOverlay = styled(motion.div)`
   & > * {
     pointer-events: auto;
   }
+
+  @media (max-width: 768px) {
+    padding: 20px;
+    align-items: flex-end;
+    padding-bottom: 40px;
+  }
 `;
 
 const DetailContent = styled(motion.div)`
@@ -247,6 +265,16 @@ const DetailContent = styled(motion.div)`
   top: 50%;
   transform: translateY(-50%);
   max-width: 500px;
+
+  @media (max-width: 768px) {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    max-width: 100%;
+    width: 100%;
+    padding: 0 16px;
+  }
 `;
 
 const InfoSection = styled(motion.div)`
@@ -259,6 +287,10 @@ const Title = styled.h1`
   font-weight: 600;
   margin: 0 0 8px 0;
   line-height: 1.2;
+
+  @media (max-width: 768px) {
+    font-size: 24px;
+  }
 `;
 
 const Subtitle = styled.p`
@@ -266,6 +298,11 @@ const Subtitle = styled.p`
   color: rgba(255, 255, 255, 0.7);
   margin: 0 0 24px 0;
   font-style: italic;
+
+  @media (max-width: 768px) {
+    font-size: 14px;
+    margin: 0 0 16px 0;
+  }
 `;
 
 const ReviewText = styled.div`
@@ -275,6 +312,12 @@ const ReviewText = styled.div`
   max-height: 200px;
   overflow-y: auto;
   margin-bottom: 24px;
+
+  @media (max-width: 768px) {
+    font-size: 13px;
+    max-height: 120px;
+    margin-bottom: 16px;
+  }
 `;
 
 const MetaRow = styled.div`
@@ -282,6 +325,12 @@ const MetaRow = styled.div`
   gap: 12px;
   margin-bottom: 24px;
   align-items: center;
+  flex-wrap: wrap;
+
+  @media (max-width: 768px) {
+    gap: 8px;
+    margin-bottom: 16px;
+  }
 `;
 
 const Badge = styled.span`
@@ -290,12 +339,21 @@ const Badge = styled.span`
   border-radius: 20px;
   font-size: 13px;
   font-weight: 500;
+
+  @media (max-width: 768px) {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
 `;
 
 const Rating = styled.span`
   color: #ffd700;
   font-size: 20px;
   letter-spacing: 2px;
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+  }
 `;
 
 const ExternalLink = styled.a`
@@ -314,6 +372,13 @@ const ExternalLink = styled.a`
 
   &:hover {
     background: rgba(255, 255, 255, 0.2);
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
+    justify-content: center;
+    padding: 14px 20px;
+    font-size: 13px;
   }
 `;
 
@@ -336,6 +401,18 @@ const BackButton = styled(motion.button)`
 
   &:hover {
     background: rgba(255, 255, 255, 0.2);
+  }
+
+  @media (max-width: 768px) {
+    top: 16px;
+    left: 16px;
+    width: 40px;
+    height: 40px;
+
+    svg {
+      width: 20px;
+      height: 20px;
+    }
   }
 `;
 
@@ -423,9 +500,13 @@ function App() {
   const colors = clickedBook ? clickedBook.colors : null;
 
   // Calculate target position (left side of screen, leaving room for details)
-  const targetX = typeof window !== "undefined" ? 100 : 100;
-  const targetY =
-    typeof window !== "undefined" ? window.innerHeight * 0.35 : 200;
+  const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+  const targetX = isMobile
+    ? (window.innerWidth - LIST_SPINE_LENGTH * 0.7) / 2
+    : 100;
+  const targetY = isMobile
+    ? window.innerHeight * 0.15
+    : window.innerHeight * 0.35;
 
   // Use stored position and rotation for animations (persists through exit animation)
   const { startX, startY, startRotation } = lastPositionRef.current;
