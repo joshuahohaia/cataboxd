@@ -26,7 +26,7 @@ const ContentWrapper = styled(motion.div)`
   gap: 60px;
   max-width: 1000px;
   width: 100%;
-  align-items: center;
+  align-items: flex-start;
 `;
 
 const BookWrapper = styled(motion.div)`
@@ -39,6 +39,7 @@ const Book = styled(motion.div)`
   width: 260px;
   height: 380px;
   transform-style: preserve-3d;
+  cursor: pointer;
 `;
 
 const BookCover = styled(motion.div)<{ $posterUrl: string }>`
@@ -89,7 +90,7 @@ const ReviewText = styled.div`
   font-size: 15px;
   line-height: 1.8;
   color: rgba(255, 255, 255, 0.85);
-  max-height: 200px;
+  max-height: 300px;
   overflow-y: auto;
   margin-bottom: 24px;
 
@@ -197,6 +198,9 @@ export function MovieDetail({ movie, index, onBack }: MovieDetailProps) {
       <ContentWrapper>
         <BookWrapper>
           <Book
+            onClick={onBack}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             initial={{
               rotateX: 60,
               rotateY: 0,

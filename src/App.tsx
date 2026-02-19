@@ -112,7 +112,7 @@ const FloatingBookContainer = styled(motion.div)`
   position: fixed;
   z-index: 200;
   perspective: 1000px;
-  pointer-events: none;
+  cursor: pointer;
 
   @media (max-width: 768px) {
     padding-top: 8vh;
@@ -263,15 +263,13 @@ const DetailOverlay = styled(motion.div)`
 const DetailContent = styled(motion.div)`
   position: absolute;
   left: 480px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 15%;
   max-width: 500px;
 
   @media (max-width: 768px) {
     position: relative;
     left: auto;
     top: auto;
-    transform: none;
     max-width: 100%;
     width: 100%;
     padding: 0 16px;
@@ -311,13 +309,13 @@ const ReviewText = styled.div`
   font-size: 15px;
   line-height: 1.8;
   color: rgba(255, 255, 255, 0.85);
-  max-height: 200px;
+  max-height: 300px;
   overflow-y: auto;
   margin-bottom: 24px;
 
   @media (max-width: 768px) {
     font-size: 13px;
-    max-height: 120px;
+    max-height: 200px;
     margin-bottom: 16px;
   }
 `;
@@ -588,6 +586,9 @@ function App() {
         <AnimatePresence>
           {clickedBook && colors && (
             <FloatingBookContainer
+              onClick={handleBack}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               initial={{
                 left: startX,
                 top: startY,
