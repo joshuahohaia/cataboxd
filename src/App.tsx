@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useSpring } from "framer-motion";
 import { ThemeProvider } from "styled-components";
 import { GlobalStyles } from "./styles/GlobalStyles";
 import { theme } from "./styles/theme";
@@ -112,12 +112,22 @@ const FloatingBookContainer = styled(motion.div)`
   position: fixed;
   z-index: 200;
   perspective: 1000px;
-  cursor: pointer;
+  cursor: grab;
+  user-select: none;
+
+  &:active {
+    cursor: grabbing;
+  }
 
   @media (max-width: 768px) {
     padding-top: 8vh;
     transform: scale(0.7);
     transform-origin: top left;
+    cursor: pointer;
+
+    &:active {
+      cursor: pointer;
+    }
   }
 `;
 
@@ -441,6 +451,15 @@ function App() {
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const lastPositionRef = useRef({ startX: 0, startY: 0, startRotation: -15 });
 
+  // Drag rotation for 3D book interaction (desktop only)
+  const dragRotateX = useMotionValue(0);
+  const dragRotateY = useMotionValue(0);
+  const springRotateX = useSpring(dragRotateX, { stiffness: 100, damping: 20 });
+  const springRotateY = useSpring(dragRotateY, { stiffness: 100, damping: 20 });
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const hasDraggedRef = useRef(false);
+
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -488,13 +507,53 @@ function App() {
   const handleBack = useCallback(() => {
     setShowDetail(false);
     setIsAnimatingOut(true);
+    // Reset drag rotation
+    dragRotateX.set(0);
+    dragRotateY.set(0);
     // Delay clearing the book state so exit animation can complete
     setTimeout(() => {
       deselect();
       setClickedBook(null);
       setIsAnimatingOut(false);
     }, 600);
-  }, [deselect]);
+  }, [deselect, dragRotateX, dragRotateY]);
+
+  // Desktop drag handlers for 3D rotation
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    isDraggingRef.current = true;
+    hasDraggedRef.current = false;
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const handleDragMove = useCallback((e: React.MouseEvent) => {
+    if (!isDraggingRef.current) return;
+
+    const deltaX = e.clientX - dragStartRef.current.x;
+    const deltaY = e.clientY - dragStartRef.current.y;
+
+    // If moved more than 5px, consider it a drag
+    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+      hasDraggedRef.current = true;
+    }
+
+    // Map mouse movement to rotation (horizontal = Y rotation, vertical = X rotation)
+    dragRotateY.set(deltaX * 0.5);
+    dragRotateX.set(deltaY * -0.3);
+  }, [dragRotateX, dragRotateY]);
+
+  const handleDragEnd = useCallback(() => {
+    isDraggingRef.current = false;
+    // Spring back to center
+    dragRotateX.set(0);
+    dragRotateY.set(0);
+  }, [dragRotateX, dragRotateY]);
+
+  const handleBookClick = useCallback(() => {
+    // Only trigger back if we didn't drag
+    if (!hasDraggedRef.current) {
+      handleBack();
+    }
+  }, [handleBack]);
 
   const showUserInput = !username || (error && movies.length === 0);
   const colors = clickedBook ? clickedBook.colors : null;
@@ -586,10 +645,12 @@ function App() {
         <AnimatePresence>
           {clickedBook && colors && (
             <FloatingBookContainer
-              onClick={handleBack}
+              onClick={handleBookClick}
               {...(!isMobile && {
-                whileHover: { scale: 1.02 },
-                whileTap: { scale: 0.98 },
+                onMouseDown: handleDragStart,
+                onMouseMove: handleDragMove,
+                onMouseUp: handleDragEnd,
+                onMouseLeave: handleDragEnd,
               })}
               initial={{
                 left: startX,
@@ -604,14 +665,22 @@ function App() {
                 ease: [0.5, 1, 0.36, 1],
               }}
             >
-              <FloatingBook
-                initial={{ rotateX: startRotation, rotateY: 0 }}
-                animate={{
-                  rotateX: isAnimatingOut ? startRotation : -65,
-                  rotateY: isAnimatingOut ? 0 : -90,
+              {/* Wrapper for drag rotation */}
+              <motion.div
+                style={{
+                  rotateX: springRotateX,
+                  rotateY: springRotateY,
+                  transformStyle: "preserve-3d",
                 }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
               >
+                <FloatingBook
+                  initial={{ rotateX: startRotation, rotateY: 0 }}
+                  animate={{
+                    rotateX: isAnimatingOut ? startRotation : -65,
+                    rotateY: isAnimatingOut ? 0 : -90,
+                  }}
+                  transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                >
                 <FaceFront $bgColor={colors.bg}>
                   <SpineContent>
                     <SpineTitle>{clickedBook.movie.filmTitle}</SpineTitle>
@@ -629,7 +698,8 @@ function App() {
                 <FaceBottom $bgColor={colors.bg} />
                 <FaceLeft $bgColor={colors.accent} />
                 <FaceRight $bgColor={colors.accent} />
-              </FloatingBook>
+                </FloatingBook>
+              </motion.div>
             </FloatingBookContainer>
           )}
         </AnimatePresence>
