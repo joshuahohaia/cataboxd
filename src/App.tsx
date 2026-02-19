@@ -587,8 +587,10 @@ function App() {
           {clickedBook && colors && (
             <FloatingBookContainer
               onClick={handleBack}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              {...(!isMobile && {
+                whileHover: { scale: 1.02 },
+                whileTap: { scale: 0.98 },
+              })}
               initial={{
                 left: startX,
                 top: startY,
