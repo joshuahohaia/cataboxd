@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { motion, AnimatePresence, useMotionValue, useSpring } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ThemeProvider } from "styled-components";
 import { GlobalStyles } from "./styles/GlobalStyles";
 import { theme } from "./styles/theme";
@@ -105,6 +105,30 @@ const DetailBackgroundOverlay = styled(motion.div) <{ $bgColor: string }>`
   background: ${(props) => props.$bgColor};
   filter: brightness(0.7) saturate(0.8);
   z-index: 100;
+
+  /* Subtle vignette effect */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 0%,
+      transparent 50%,
+      rgba(0, 0, 0, 0.3) 100%
+    );
+    pointer-events: none;
+  }
+
+  /* Subtle noise texture for depth */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
 `;
 
 // Floating book that animates between states - uses same dimensions as list spine
@@ -146,41 +170,87 @@ const Face = styled.div`
 `;
 
 // Front face - spine with title
-const FaceFront = styled(Face) <{ $bgColor: string }>`
+const FaceFront = styled(Face) <{ $bgColor: string; $brightness: number }>`
   width: ${LIST_SPINE_LENGTH}px;
   height: ${BOOK_THICKNESS}px;
   margin-left: -${LIST_SPINE_LENGTH / 2}px;
   margin-top: -${BOOK_THICKNESS / 2}px;
   background: ${(props) => props.$bgColor};
+  filter: brightness(${(props) => props.$brightness});
   display: flex;
   align-items: center;
   padding: 0 16px;
   transform: translateZ(${LIST_COVER_WIDTH / 2}px);
+  transition: filter 0.1s ease-out;
+
+  /* Spine highlight - subtle vertical gradient */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      transparent 20%,
+      transparent 80%,
+      rgba(0, 0, 0, 0.1) 100%
+    );
+    pointer-events: none;
+  }
 `;
 
 // Back face
-const FaceBack = styled(Face) <{ $bgColor: string }>`
+const FaceBack = styled(Face) <{ $bgColor: string; $brightness: number }>`
   width: ${LIST_SPINE_LENGTH}px;
   height: ${BOOK_THICKNESS}px;
   margin-left: -${LIST_SPINE_LENGTH / 2}px;
   margin-top: -${BOOK_THICKNESS / 2}px;
   background: ${(props) => props.$bgColor};
-  filter: brightness(0.5);
+  filter: brightness(${(props) => props.$brightness});
   transform: rotateY(180deg) translateZ(${LIST_COVER_WIDTH / 2}px);
+  transition: filter 0.1s ease-out;
 `;
 
 // Top face - the cover with poster
-const FaceTop = styled(Face) <{ $bgColor: string }>`
+const FaceTop = styled(Face) <{ $bgColor: string; $brightness: number }>`
   width: ${LIST_SPINE_LENGTH}px;
   height: ${LIST_COVER_WIDTH}px;
   margin-left: -${LIST_SPINE_LENGTH / 2}px;
   margin-top: -${LIST_COVER_WIDTH / 2}px;
   background: ${(props) => props.$bgColor};
+  filter: brightness(${(props) => props.$brightness});
   transform: rotateX(90deg) translateZ(${BOOK_THICKNESS / 2}px);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: filter 0.1s ease-out;
+
+  /* Glossy plastic overlay */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.25) 0%,
+      rgba(255, 255, 255, 0.08) 25%,
+      transparent 50%,
+      rgba(0, 0, 0, 0.05) 75%,
+      rgba(0, 0, 0, 0.15) 100%
+    );
+    pointer-events: none;
+  }
+
+  /* Inner shadow for depth */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+    z-index: 1;
+  }
 `;
 
 const PosterImage = styled.img`
@@ -195,36 +265,69 @@ const PosterImage = styled.img`
 `;
 
 // Bottom face
-const FaceBottom = styled(Face) <{ $bgColor: string }>`
+const FaceBottom = styled(Face) <{ $bgColor: string; $brightness: number }>`
   width: ${LIST_SPINE_LENGTH}px;
   height: ${LIST_COVER_WIDTH}px;
   margin-left: -${LIST_SPINE_LENGTH / 2}px;
   margin-top: -${LIST_COVER_WIDTH / 2}px;
   background: ${(props) => props.$bgColor};
-  filter: brightness(0.3);
+  filter: brightness(${(props) => props.$brightness});
   transform: rotateX(-90deg) translateZ(${BOOK_THICKNESS / 2}px);
+  transition: filter 0.1s ease-out;
 `;
 
 // Left face
-const FaceLeft = styled(Face) <{ $bgColor: string }>`
+const FaceLeft = styled(Face) <{ $bgColor: string; $brightness: number }>`
   width: ${LIST_COVER_WIDTH}px;
   height: ${BOOK_THICKNESS}px;
   margin-left: -${LIST_COVER_WIDTH / 2}px;
   margin-top: -${BOOK_THICKNESS / 2}px;
   background: ${(props) => props.$bgColor};
-  filter: brightness(0.85);
+  filter: brightness(${(props) => props.$brightness});
   transform: rotateY(-90deg) translateZ(${LIST_SPINE_LENGTH / 2}px);
+  transition: filter 0.1s ease-out;
+
+  /* Edge highlight */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.15) 0%,
+      transparent 30%,
+      transparent 70%,
+      rgba(0, 0, 0, 0.1) 100%
+    );
+    pointer-events: none;
+  }
 `;
 
 // Right face
-const FaceRight = styled(Face) <{ $bgColor: string }>`
+const FaceRight = styled(Face) <{ $bgColor: string; $brightness: number }>`
   width: ${LIST_COVER_WIDTH}px;
   height: ${BOOK_THICKNESS}px;
   margin-left: -${LIST_COVER_WIDTH / 2}px;
   margin-top: -${BOOK_THICKNESS / 2}px;
   background: ${(props) => props.$bgColor};
-  filter: brightness(0.7);
+  filter: brightness(${(props) => props.$brightness});
   transform: rotateY(90deg) translateZ(${LIST_SPINE_LENGTH / 2}px);
+  transition: filter 0.1s ease-out;
+
+  /* Edge shadow */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.05) 0%,
+      transparent 30%,
+      transparent 70%,
+      rgba(0, 0, 0, 0.15) 100%
+    );
+    pointer-events: none;
+  }
 `;
 
 const SpineContent = styled.div`
@@ -432,6 +535,71 @@ function renderStars(rating: number): string {
   return "\u2605".repeat(fullStars) + (hasHalf ? "\u00BD" : "");
 }
 
+// Dynamic lighting calculation for 3D faces
+// Light source: top-right-front direction
+const LIGHT_DIR = { x: 0.5, y: -0.7, z: 0.5 };
+
+// Face normals in local space (before any rotation)
+const FACE_NORMALS = {
+  front: { x: 0, y: 0, z: 1 },
+  back: { x: 0, y: 0, z: -1 },
+  top: { x: 0, y: -1, z: 0 },
+  bottom: { x: 0, y: 1, z: 0 },
+  left: { x: -1, y: 0, z: 0 },
+  right: { x: 1, y: 0, z: 0 },
+};
+
+function calculateFaceBrightness(
+  rotationX: number,
+  rotationY: number,
+  faceNormal: { x: number; y: number; z: number }
+): number {
+  // Convert degrees to radians
+  const radX = (rotationX * Math.PI) / 180;
+  const radY = (rotationY * Math.PI) / 180;
+
+  // Rotate normal by Y (around Y axis)
+  const cosY = Math.cos(radY);
+  const sinY = Math.sin(radY);
+  const afterY = {
+    x: faceNormal.x * cosY + faceNormal.z * sinY,
+    y: faceNormal.y,
+    z: -faceNormal.x * sinY + faceNormal.z * cosY,
+  };
+
+  // Rotate by X (around X axis)
+  const cosX = Math.cos(radX);
+  const sinX = Math.sin(radX);
+  const rotatedNormal = {
+    x: afterY.x,
+    y: afterY.y * cosX - afterY.z * sinX,
+    z: afterY.y * sinX + afterY.z * cosX,
+  };
+
+  // Dot product with light direction
+  const dot =
+    rotatedNormal.x * LIGHT_DIR.x +
+    rotatedNormal.y * LIGHT_DIR.y +
+    rotatedNormal.z * LIGHT_DIR.z;
+
+  // Map to brightness (0.3 to 1.1 range for nice contrast)
+  // Add ambient light so nothing is completely dark
+  const ambient = 0.35;
+  const diffuse = 0.75;
+  return Math.max(ambient, ambient + diffuse * Math.max(0, dot));
+}
+
+function getFaceBrightness(rotationX: number, rotationY: number) {
+  return {
+    front: calculateFaceBrightness(rotationX, rotationY, FACE_NORMALS.front),
+    back: calculateFaceBrightness(rotationX, rotationY, FACE_NORMALS.back),
+    top: calculateFaceBrightness(rotationX, rotationY, FACE_NORMALS.top),
+    bottom: calculateFaceBrightness(rotationX, rotationY, FACE_NORMALS.bottom),
+    left: calculateFaceBrightness(rotationX, rotationY, FACE_NORMALS.left),
+    right: calculateFaceBrightness(rotationX, rotationY, FACE_NORMALS.right),
+  };
+}
+
 interface ClickedBookInfo {
   movie: Movie;
   index: number;
@@ -451,11 +619,11 @@ function App() {
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const lastPositionRef = useRef({ startX: 0, startY: 0, startRotation: -15 });
 
-  // Drag rotation for 3D book interaction (desktop only)
-  const dragRotateX = useMotionValue(0);
-  const dragRotateY = useMotionValue(0);
-  const springRotateX = useSpring(dragRotateX, { stiffness: 100, damping: 20 });
-  const springRotateY = useSpring(dragRotateY, { stiffness: 100, damping: 20 });
+  // Micro-interaction rotation for 3D book (desktop only)
+  // Base rotation when detail view opens
+  const BASE_ROTATION = { x: -65, y: -90 };
+  const MAX_ROTATION = 15; // Max degrees of micro-rotation
+  const [userRotation, setUserRotation] = useState({ x: 0, y: 0 });
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const hasDraggedRef = useRef(false);
@@ -507,18 +675,17 @@ function App() {
   const handleBack = useCallback(() => {
     setShowDetail(false);
     setIsAnimatingOut(true);
-    // Reset drag rotation
-    dragRotateX.set(0);
-    dragRotateY.set(0);
+    // Reset user rotation
+    setUserRotation({ x: 0, y: 0 });
     // Delay clearing the book state so exit animation can complete
     setTimeout(() => {
       deselect();
       setClickedBook(null);
       setIsAnimatingOut(false);
     }, 600);
-  }, [deselect, dragRotateX, dragRotateY]);
+  }, [deselect]);
 
-  // Desktop drag handlers for 3D rotation
+  // Desktop drag handlers for micro-interaction rotation
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     isDraggingRef.current = true;
     hasDraggedRef.current = false;
@@ -536,17 +703,18 @@ function App() {
       hasDraggedRef.current = true;
     }
 
-    // Map mouse movement to rotation (horizontal = Y rotation, vertical = X rotation)
-    dragRotateY.set(deltaX * 0.5);
-    dragRotateX.set(deltaY * -0.3);
-  }, [dragRotateX, dragRotateY]);
+    // Map drag to rotation with limits (micro-interaction feel)
+    const rotX = Math.max(-MAX_ROTATION, Math.min(MAX_ROTATION, deltaY * -0.15));
+    const rotY = Math.max(-MAX_ROTATION, Math.min(MAX_ROTATION, deltaX * 0.15));
+
+    setUserRotation({ x: rotX, y: rotY });
+  }, []);
 
   const handleDragEnd = useCallback(() => {
     isDraggingRef.current = false;
     // Spring back to center
-    dragRotateX.set(0);
-    dragRotateY.set(0);
-  }, [dragRotateX, dragRotateY]);
+    setUserRotation({ x: 0, y: 0 });
+  }, []);
 
   const handleBookClick = useCallback(() => {
     // Only trigger back if we didn't drag
@@ -665,41 +833,39 @@ function App() {
                 ease: [0.5, 1, 0.36, 1],
               }}
             >
-              {/* Wrapper for drag rotation */}
-              <motion.div
-                style={{
-                  rotateX: springRotateX,
-                  rotateY: springRotateY,
-                  transformStyle: "preserve-3d",
-                }}
-              >
-                <FloatingBook
-                  initial={{ rotateX: startRotation, rotateY: 0 }}
-                  animate={{
-                    rotateX: isAnimatingOut ? startRotation : -65,
-                    rotateY: isAnimatingOut ? 0 : -90,
-                  }}
-                  transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                >
-                <FaceFront $bgColor={colors.bg}>
-                  <SpineContent>
-                    <SpineTitle>{clickedBook.movie.filmTitle}</SpineTitle>
-                  </SpineContent>
-                </FaceFront>
-                <FaceBack $bgColor={colors.bg} />
-                <FaceTop $bgColor={colors.accent}>
-                  {clickedBook.movie.posterUrl && (
-                    <PosterImage
-                      src={clickedBook.movie.posterUrl}
-                      alt={clickedBook.movie.filmTitle}
-                    />
-                  )}
-                </FaceTop>
-                <FaceBottom $bgColor={colors.bg} />
-                <FaceLeft $bgColor={colors.accent} />
-                <FaceRight $bgColor={colors.accent} />
-                </FloatingBook>
-              </motion.div>
+              {(() => {
+                const currentRotX = isAnimatingOut ? startRotation : BASE_ROTATION.x + userRotation.x;
+                const currentRotY = isAnimatingOut ? 0 : BASE_ROTATION.y + userRotation.y;
+                const brightness = getFaceBrightness(currentRotX, currentRotY);
+                return (
+                  <FloatingBook
+                    initial={{ rotateX: startRotation, rotateY: 0 }}
+                    animate={{
+                      rotateX: currentRotX,
+                      rotateY: currentRotY,
+                    }}
+                    transition={isDraggingRef.current ? { duration: 0 } : { duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <FaceFront $bgColor={colors.bg} $brightness={brightness.front}>
+                      <SpineContent>
+                        <SpineTitle>{clickedBook.movie.filmTitle}</SpineTitle>
+                      </SpineContent>
+                    </FaceFront>
+                    <FaceBack $bgColor={colors.bg} $brightness={brightness.back} />
+                    <FaceTop $bgColor={colors.accent} $brightness={brightness.top}>
+                      {clickedBook.movie.posterUrl && (
+                        <PosterImage
+                          src={clickedBook.movie.posterUrl}
+                          alt={clickedBook.movie.filmTitle}
+                        />
+                      )}
+                    </FaceTop>
+                    <FaceBottom $bgColor={colors.bg} $brightness={brightness.bottom} />
+                    <FaceLeft $bgColor={colors.accent} $brightness={brightness.left} />
+                    <FaceRight $bgColor={colors.accent} $brightness={brightness.right} />
+                  </FloatingBook>
+                );
+              })()}
             </FloatingBookContainer>
           )}
         </AnimatePresence>
