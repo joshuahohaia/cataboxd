@@ -139,6 +139,7 @@ const FloatingBookContainer = styled(motion.div)`
   cursor: grab;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  touch-action: none;
 
   &:active {
     cursor: grabbing;
@@ -148,10 +149,10 @@ const FloatingBookContainer = styled(motion.div)`
     padding-top: 8vh;
     transform: scale(0.7);
     transform-origin: top left;
-    cursor: pointer;
+    cursor: grab;
 
     &:active {
-      cursor: pointer;
+      cursor: grabbing;
     }
   }
 `;
@@ -686,7 +687,7 @@ function App() {
     }, 600);
   }, [deselect]);
 
-  // Desktop drag handlers for micro-interaction rotation
+  // Drag handlers for micro-interaction rotation (desktop mouse)
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     isDraggingRef.current = true;
     hasDraggedRef.current = false;
@@ -712,6 +713,39 @@ function App() {
   }, []);
 
   const handleDragEnd = useCallback(() => {
+    isDraggingRef.current = false;
+    // Spring back to center
+    setUserRotation({ x: 0, y: 0 });
+  }, []);
+
+  // Touch handlers for mobile
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    isDraggingRef.current = true;
+    hasDraggedRef.current = false;
+    const touch = e.touches[0];
+    dragStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDraggingRef.current) return;
+
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - dragStartRef.current.x;
+    const deltaY = touch.clientY - dragStartRef.current.y;
+
+    // If moved more than 5px, consider it a drag
+    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+      hasDraggedRef.current = true;
+    }
+
+    // Map drag to rotation with limits (micro-interaction feel)
+    const rotX = Math.max(-MAX_ROTATION, Math.min(MAX_ROTATION, deltaY * -0.15));
+    const rotY = Math.max(-MAX_ROTATION, Math.min(MAX_ROTATION, deltaX * 0.15));
+
+    setUserRotation({ x: rotX, y: rotY });
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
     isDraggingRef.current = false;
     // Spring back to center
     setUserRotation({ x: 0, y: 0 });
@@ -815,12 +849,13 @@ function App() {
           {clickedBook && colors && (
             <FloatingBookContainer
               onClick={handleBookClick}
-              {...(!isMobile && {
-                onMouseDown: handleDragStart,
-                onMouseMove: handleDragMove,
-                onMouseUp: handleDragEnd,
-                onMouseLeave: handleDragEnd,
-              })}
+              onMouseDown={handleDragStart}
+              onMouseMove={handleDragMove}
+              onMouseUp={handleDragEnd}
+              onMouseLeave={handleDragEnd}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
               initial={{
                 left: startX,
                 top: startY,
