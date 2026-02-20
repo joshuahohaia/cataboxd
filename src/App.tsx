@@ -138,6 +138,7 @@ const FloatingBookContainer = styled(motion.div)`
   perspective: 1000px;
   cursor: grab;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
 
   &:active {
     cursor: grabbing;

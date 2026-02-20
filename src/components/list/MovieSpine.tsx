@@ -127,6 +127,7 @@ const BookWrapper = styled(motion.div)`
   justify-content: center;
   position: relative;
   will-change: transform;
+  -webkit-tap-highlight-color: transparent;
 `;
 
 const Book3D = styled.div<{ $rotation: number; $thickness: number }>`
