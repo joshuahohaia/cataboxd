@@ -1,46 +1,32 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Movie } from '../types/movie';
 import { fetchLetterboxdFeed } from '../services/rssParser';
+import {
+  getCachedMovies,
+  setCachedMovies,
+  clearCachedMovies,
+  getCacheTime,
+  isCacheStale,
+} from '../services/feedCache';
 
 interface UseLetterboxdFeedResult {
   movies: Movie[];
   isLoading: boolean;
   error: string | null;
   username: string | null;
-  loadUser: (username: string) => Promise<void>;
+  loadUser: (username: string, options?: LoadUserOptions) => Promise<void>;
+  refresh: () => Promise<void>;
   clearUser: () => void;
 }
 
 const STORAGE_KEY = 'cataboxd_username';
-const CACHE_KEY = 'cataboxd_movies';
-const CACHE_TIME_KEY = 'cataboxd_cache_time';
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-function getCachedMovies(): Movie[] | null {
-  try {
-    const cacheTime = localStorage.getItem(CACHE_TIME_KEY);
-    if (!cacheTime || Date.now() - parseInt(cacheTime) > CACHE_DURATION) {
-      return null;
-    }
-    const cached = localStorage.getItem(CACHE_KEY);
-    return cached ? JSON.parse(cached) : null;
-  } catch {
-    return null;
-  }
-}
-
-function setCachedMovies(movies: Movie[]) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(movies));
-    localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
-  } catch {
-    // Ignore storage errors
-  }
-}
-
-function clearCache() {
-  localStorage.removeItem(CACHE_KEY);
-  localStorage.removeItem(CACHE_TIME_KEY);
+interface LoadUserOptions {
+  /**
+   * Keep the currently displayed movies when the fetch fails. Used by
+   * background revalidation so a transient error does not blank the list.
+   */
+  preserveMoviesOnError?: boolean;
 }
 
 export function useLetterboxdFeed(): UseLetterboxdFeedResult {
@@ -52,7 +38,8 @@ export function useLetterboxdFeed(): UseLetterboxdFeedResult {
   });
   const hasFetched = useRef(false);
 
-  const loadUser = useCallback(async (newUsername: string) => {
+  const loadUser = useCallback(async (newUsername: string, options: LoadUserOptions = {}) => {
+    const { preserveMoviesOnError = false } = options;
     const trimmed = newUsername.trim().toLowerCase();
     if (!trimmed) {
       setError('Please enter a username');
@@ -71,7 +58,9 @@ export function useLetterboxdFeed(): UseLetterboxdFeedResult {
       hasFetched.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch feed');
-      setMovies([]);
+      if (!preserveMoviesOnError) {
+        setMovies([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +70,7 @@ export function useLetterboxdFeed(): UseLetterboxdFeedResult {
     setUsername(null);
     setMovies([]);
     setError(null);
-    clearCache();
+    clearCachedMovies();
     localStorage.removeItem(STORAGE_KEY);
     hasFetched.current = false;
   }, []);
@@ -94,5 +83,31 @@ export function useLetterboxdFeed(): UseLetterboxdFeedResult {
     }
   }, [username, movies.length, loadUser]);
 
-  return { movies, isLoading, error, username, loadUser, clearUser };
+  // Revalidate while the app stays open. The TTL was previously only checked
+  // when the hook initialised, so a session left open past the cache duration
+  // kept showing stale movies until a full reload.
+  useEffect(() => {
+    if (!username) return;
+
+    const revalidateIfStale = () => {
+      if (isCacheStale(getCacheTime())) {
+        loadUser(username, { preserveMoviesOnError: true });
+      }
+    };
+
+    window.addEventListener('focus', revalidateIfStale);
+    const intervalId = setInterval(revalidateIfStale, 60 * 1000);
+    return () => {
+      window.removeEventListener('focus', revalidateIfStale);
+      clearInterval(intervalId);
+    };
+  }, [username, loadUser]);
+
+  const refresh = useCallback(async () => {
+    if (username) {
+      await loadUser(username, { preserveMoviesOnError: true });
+    }
+  }, [username, loadUser]);
+
+  return { movies, isLoading, error, username, loadUser, refresh, clearUser };
 }

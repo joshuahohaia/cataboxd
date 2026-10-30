@@ -54,15 +54,32 @@ function getNamespacedContent(element: Element, namespace: string, localName: st
   return el?.textContent?.trim() || '';
 }
 
-export async function fetchLetterboxdFeed(username: string): Promise<Movie[]> {
+interface FetchFeedOptions {
+  /**
+   * Allow third-party CORS proxy fallbacks when our own API route fails.
+   * Defaults to local development only: in production a failed API should
+   * surface as an error, not silently route the request (and the username)
+   * through public proxies.
+   */
+  allowProxyFallback?: boolean;
+}
+
+export async function fetchLetterboxdFeed(
+  username: string,
+  options: FetchFeedOptions = {}
+): Promise<Movie[]> {
+  const { allowProxyFallback = import.meta.env.DEV } = options;
   const rssUrl = `https://letterboxd.com/${username}/rss/`;
 
   let xmlContent: string;
   try {
     // Try our own API route first (works in production)
     xmlContent = await fetchFromApi(username);
-  } catch {
-    // Fall back to CORS proxies (useful for local dev)
+  } catch (apiError) {
+    if (!allowProxyFallback) {
+      throw apiError;
+    }
+    // Fall back to CORS proxies (local development only)
     xmlContent = await fetchWithCorsProxy(rssUrl);
   }
   const parser = new DOMParser();
